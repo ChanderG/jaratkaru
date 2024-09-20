@@ -41,6 +41,15 @@ class Tokenizer:
             except ValueError:
                 return token
 
+    def raise_parse_error(self, msg, tok):
+        fmt_msg = msg + f" at character {tok[1]}"
+        fmt_msg += "\n"
+        fmt_msg += self.txt + "\n"
+        fmt_msg += "-"*(tok[1]-1) + "^"
+        fmt_msg += "\n"
+
+        raise ParseException(fmt_msg)
+
     def parse(self):
         stack = []
         def push(item):
@@ -59,13 +68,13 @@ class Tokenizer:
                 while True:
                     item = pop()
                     if item == None:
-                        raise ParseException(f"Unbalanced ) found: {t}")
+                        self.raise_parse_error("Unbalanced ) found", t)
                     elif isinstance(item, Sexp):
                         lis.insert(0, item)
                     elif item[0] == "(":
                         break
                     else: # should not reach here
-                        raise ParseException(f"Unexpected token found: {item}")
+                        self.raise_parse_error("Unexpected token found", item)
 
                 push(Sexp(lis))
             else:
@@ -80,7 +89,7 @@ class Tokenizer:
             if isinstance(item, Sexp):
                 results.insert(0, item)
             else: # un-expected
-                raise ParseException(f"Unbalanced ( found: {item}")
+                self.raise_parse_error("Unbalanced ( found", item)
 
         return results
 
@@ -103,6 +112,6 @@ def main():
             inp = input("user> ")
             print(rep(inp))
         except ParseException as p:
-            print(p)
+            print("Error in parsing: ", p)
 
 main()
