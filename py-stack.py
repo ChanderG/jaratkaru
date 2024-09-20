@@ -7,9 +7,10 @@ class Sexp:
 class ParseException(Exception):
     pass
 
-class Tokenizer:
+class Parser:
     def __init__(self, txt):
         self.txt = txt
+        # Now, tokenize the input
         # works only for single line input
         # does not work for strings
 
@@ -94,8 +95,8 @@ class Tokenizer:
         return results
 
 def READ(inp):
-    t = Tokenizer(inp)
-    return t.parse()
+    p = Parser(inp)
+    return p.parse()
 
 def EVAL(inp):
     return inp
