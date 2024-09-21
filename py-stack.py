@@ -1,8 +1,18 @@
 from dataclasses import dataclass
 
 @dataclass
-class Sexp:
-  val: any
+class SexpAtom:
+    val: any
+
+@dataclass
+class SexpSymbol:
+    val: str
+
+@dataclass
+class SexpList:
+    val: list
+
+Sexp = SexpAtom | SexpSymbol | SexpList
 
 class ParseException(Exception):
     pass
@@ -36,11 +46,11 @@ class Parser:
         self.tokens = toks
 
     def read_atom(self, token):
-        try: return int(token)
+        try: return SexpAtom(int(token))
         except ValueError:
-            try: return float(token)
+            try: return SexpAtom(float(token))
             except ValueError:
-                return token
+                return SexpSymbol(token)
 
     def raise_parse_error(self, msg, tok):
         fmt_msg = msg + f" at character {tok[1]}"
@@ -77,9 +87,9 @@ class Parser:
                     else: # should not reach here
                         self.raise_parse_error("Unexpected token found", item)
 
-                push(Sexp(lis))
+                push(SexpList(lis))
             else:
-                push(Sexp(self.read_atom(t[0])))
+                push(self.read_atom(t[0]))
 
         # check if stack is empty of tokens here
         results = []
@@ -98,14 +108,32 @@ def READ(inp):
     p = Parser(inp)
     return p.parse()
 
-def EVAL(inp):
-    return inp
+def EVAL(sexp, env):
+    if isinstance(sexp, SexpAtom):
+        return sexp.val
+    elif isinstance(sexp, SexpSymbol):
+        return env[sexp.val]
+    elif isinstance(sexp, SexpList):
+        eval_lis = list(map(lambda x: EVAL(x, env), sexp.val))
+        return eval_lis[0](*eval_lis[1:])
+    else:
+        return None
 
 def PRINT(inp):
     return inp
 
 def rep(inp):
-    return PRINT(EVAL(READ(inp)))
+
+    env = {'+': lambda a,b: a+b,
+           '-': lambda a,b: a-b,
+           '*': lambda a,b: a*b,
+           '/': lambda a,b: int(a/b)}
+
+    sexps = READ(inp)
+    res = []
+    for sexp in sexps:
+        res.append(EVAL(sexp, env))
+    return PRINT(res[-1])
 
 def main():
     while True:
