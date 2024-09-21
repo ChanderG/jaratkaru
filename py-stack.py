@@ -16,6 +16,8 @@ Sexp = SexpAtom | SexpSymbol | SexpList
 
 class ParseException(Exception):
     pass
+class UnboundError(Exception):
+    pass
 
 class Parser:
     def __init__(self, txt):
@@ -104,6 +106,22 @@ class Parser:
 
         return results
 
+class Env:
+    def __init__(self, outer = None):
+        self.outer = outer
+        self.data = {}
+
+    def get(self, key):
+        if key in self.data:
+            return self.data[key]
+        elif self.outer is not None:
+            return self.outer.get(key)
+        else:
+            raise UnboundError(key)
+
+    def set(self, key, value):
+        self.data[key] = value
+
 def READ(inp):
     p = Parser(inp)
     return p.parse()
@@ -112,7 +130,7 @@ def EVAL(sexp, env):
     if isinstance(sexp, SexpAtom):
         return sexp.val
     elif isinstance(sexp, SexpSymbol):
-        return env[sexp.val]
+        return env.get(sexp.val)
     elif isinstance(sexp, SexpList):
         eval_lis = list(map(lambda x: EVAL(x, env), sexp.val))
         return eval_lis[0](*eval_lis[1:])
@@ -123,11 +141,12 @@ def PRINT(inp):
     return inp
 
 def rep(inp):
+    env = Env()
 
-    env = {'+': lambda a,b: a+b,
-           '-': lambda a,b: a-b,
-           '*': lambda a,b: a*b,
-           '/': lambda a,b: int(a/b)}
+    env.set('+', lambda a,b: a+b)
+    env.set('-', lambda a,b: a-b)
+    env.set('*', lambda a,b: a*b)
+    env.set('/', lambda a,b: a/b)
 
     sexps = READ(inp)
     res = []
@@ -142,5 +161,7 @@ def main():
             print(rep(inp))
         except ParseException as p:
             print("Error in parsing: ", p)
+        except UnboundError as e:
+            print("Unbound symbol used: ", e)
 
 main()
