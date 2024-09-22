@@ -183,6 +183,19 @@ def eval_setq(sexp, env):
 
     return res
 
+def eval_if(sexp, env):
+    if len(sexp.val) > 4:
+        raise MalformedExpression("if should have max 4 args" + sexp.tok.format_loc())
+
+    condition = EVAL(sexp.val[1], env)
+    if condition:
+        return EVAL(sexp.val[2], env)
+    else:
+        if len(sexp.val) == 4:
+            return EVAL(sexp.val[3], env)
+        else:
+            return None
+
 def EVAL(sexp, env):
     if isinstance(sexp, SexpAtom):
         return sexp.val
@@ -195,6 +208,8 @@ def EVAL(sexp, env):
             return eval_let_star(sexp, env)
         elif form.val == "setq":
             return eval_setq(sexp, env)
+        elif form.val == "if":
+            return eval_if(sexp, env)
         else:
             eval_lis = list(map(lambda x: EVAL(x, env), sexp.val))
             return eval_lis[0](*eval_lis[1:])
@@ -248,5 +263,6 @@ env.set('+', lambda a,b: a+b)
 env.set('-', lambda a,b: a-b)
 env.set('*', lambda a,b: a*b)
 env.set('/', lambda a,b: a/b)
+env.set('<', lambda a,b: a<b)
 
 main()

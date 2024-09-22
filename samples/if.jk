@@ -1,0 +1,8 @@
+(setq a 100)
+(setq b 20)
+
+(if (< a b)
+  (setq c 1)
+  (setq c -1))
+
+(setq d (if (< a b) 1 -1))
