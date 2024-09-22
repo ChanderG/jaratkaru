@@ -228,6 +228,18 @@ def eval_lambda(sexp, env):
 
     return Proc(sexp.val[1], sexp.val[2:], env)
 
+def eval_quote(sexp, env):
+    if len(sexp.val) != 2:
+        raise MalformedExpression("single arg expected to quote" + sexp.tok.format_loc())
+
+    return sexp.val[1]
+
+def eval_eval(sexp, env):
+    if len(sexp.val) != 2:
+        raise MalformedExpression("single arg expected to eval" + sexp.tok.format_loc())
+
+    return EVAL(EVAL(sexp.val[1], env), env)
+
 def EVAL(sexp, env):
     if isinstance(sexp, SexpAtom):
         return sexp.val
@@ -246,11 +258,15 @@ def EVAL(sexp, env):
             return eval_progn(sexp, env)
         elif form.val == "lambda":
             return eval_lambda(sexp, env)
+        elif form.val == "quote":
+            return eval_quote(sexp, env)
+        elif form.val == "eval":
+            return eval_eval(sexp, env)
         else:
             eval_lis = list(map(lambda x: EVAL(x, env), sexp.val))
             return eval_lis[0](*eval_lis[1:])
     else:
-        return None
+        return sexp # not even an sexp here
 
 def PRINT(inp):
     return inp
@@ -300,5 +316,6 @@ env.set('-', lambda a,b: a-b)
 env.set('*', lambda a,b: a*b)
 env.set('/', lambda a,b: a/b)
 env.set('<', lambda a,b: a<b)
+env.set('print', print)
 
 main()
