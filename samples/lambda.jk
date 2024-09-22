@@ -1,0 +1,1 @@
+(setq res ((lambda (x) (+ x 10)) 10))

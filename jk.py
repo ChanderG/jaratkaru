@@ -141,6 +141,23 @@ class Env:
     def set(self, key, value):
         self.data[key] = value
 
+class Proc:
+    def __init__(self, params, body, env):
+        self.params = params
+        self.body = body
+        self.env = env
+
+    def __call__(self, *args):
+        # new env for the func context
+        l_env = Env(self.env)
+        # update all params
+        for p, a in zip(self.params.val, args):
+            l_env.set(p.val, a)
+        # actual eval of forms in the lambda
+        for exp in self.body:
+            res = EVAL(exp, l_env)
+        return res
+
 def READ(inp):
     p = Parser(inp)
     return p.parse()
@@ -202,6 +219,15 @@ def eval_progn(sexp, env):
         res = EVAL(se, env)
     return res
 
+def eval_lambda(sexp, env):
+    if len(sexp.val) < 3:
+        raise MalformedExpression("too few exp in lambda definition" + sexp.tok.format_loc())
+
+    if not isinstance(sexp.val[1], SexpList):
+        raise MalformedExpression("arg definition should be a list" + sexp.tok.format_loc())
+
+    return Proc(sexp.val[1], sexp.val[2:], env)
+
 def EVAL(sexp, env):
     if isinstance(sexp, SexpAtom):
         return sexp.val
@@ -218,6 +244,8 @@ def EVAL(sexp, env):
             return eval_if(sexp, env)
         elif form.val == "progn":
             return eval_progn(sexp, env)
+        elif form.val == "lambda":
+            return eval_lambda(sexp, env)
         else:
             eval_lis = list(map(lambda x: EVAL(x, env), sexp.val))
             return eval_lis[0](*eval_lis[1:])
