@@ -2,8 +2,19 @@ from dataclasses import dataclass
 
 @dataclass
 class Token:
-    val: str
-    pos: int
+    def __init__(self, val: str, pos: int, txt: str):
+        self.val = val
+        self.pos = pos
+        self.txt = txt
+
+    def format_loc(self):
+        fmt_msg = f" at character {self.pos}"
+        fmt_msg += "\n"
+        fmt_msg += self.txt + "\n"
+        fmt_msg += "-"*(self.pos-1) + "^"
+        fmt_msg += "\n"
+
+        return fmt_msg
 
 @dataclass
 class SexpAtom:
@@ -41,7 +52,7 @@ class Parser:
         while idx < len(txt):
             ch = txt[idx]
             if ch == "(" or ch == ")":
-                push(Token(ch, idx+1))
+                push(Token(ch, idx+1, self.txt))
             elif ch == " ":
                 pass
             else:
@@ -50,7 +61,7 @@ class Parser:
                 while idx+1 < len(txt) and txt[idx+1] not in ["(", ")", " "]:
                     idx += 1
                     tok = tok + txt[idx]
-                push(Token(tok, start))
+                push(Token(tok, start, self.txt))
             idx += 1
         self.tokens = toks
 
@@ -62,12 +73,7 @@ class Parser:
                 return SexpSymbol(token)
 
     def raise_parse_error(self, msg, tok):
-        fmt_msg = msg + f" at character {tok.pos}"
-        fmt_msg += "\n"
-        fmt_msg += self.txt + "\n"
-        fmt_msg += "-"*(tok.pos-1) + "^"
-        fmt_msg += "\n"
-
+        fmt_msg = msg + tok.format_loc()
         raise ParseException(fmt_msg)
 
     def parse(self):
