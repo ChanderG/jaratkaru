@@ -19,14 +19,17 @@ class Token:
 @dataclass
 class SexpAtom:
     val: any
+    tok: Token
 
 @dataclass
 class SexpSymbol:
     val: str
+    tok: Token
 
 @dataclass
 class SexpList:
     val: list
+    tok: Token
 
 Sexp = SexpAtom | SexpSymbol | SexpList
 
@@ -66,15 +69,11 @@ class Parser:
         self.tokens = toks
 
     def read_atom(self, token):
-        try: return SexpAtom(int(token))
+        try: return SexpAtom(int(token.val), token)
         except ValueError:
-            try: return SexpAtom(float(token))
+            try: return SexpAtom(float(token.val), token)
             except ValueError:
-                return SexpSymbol(token)
-
-    def raise_parse_error(self, msg, tok):
-        fmt_msg = msg + tok.format_loc()
-        raise ParseException(fmt_msg)
+                return SexpSymbol(token.val, token)
 
     def parse(self):
         stack = []
@@ -94,17 +93,17 @@ class Parser:
                 while True:
                     item = pop()
                     if item == None:
-                        self.raise_parse_error("Unbalanced ) found", t)
+                        raise ParseException("Unbalanced ) found" + t.format_loc())
                     elif isinstance(item, Sexp):
                         lis.insert(0, item)
                     elif item.val == "(":
                         break
                     else: # should not reach here
-                        self.raise_parse_error("Unexpected token found", item)
+                        raise ParseException("Unexpected token found" + item.format_loc())
 
-                push(SexpList(lis))
+                push(SexpList(lis, item))
             else:
-                push(self.read_atom(t.val))
+                push(self.read_atom(t))
 
         # check if stack is empty of tokens here
         results = []
@@ -115,7 +114,7 @@ class Parser:
             if isinstance(item, Sexp):
                 results.insert(0, item)
             else: # un-expected
-                self.raise_parse_error("Unbalanced ( found", item)
+                raise ParseException("Unbalanced ( found" + item.format_loc())
 
         return results
 
@@ -124,13 +123,13 @@ class Env:
         self.outer = outer
         self.data = {}
 
-    def get(self, key):
-        if key in self.data:
-            return self.data[key]
+    def get(self, key: SexpSymbol):
+        if key.val in self.data:
+            return self.data[key.val]
         elif self.outer is not None:
             return self.outer.get(key)
         else:
-            raise UnboundError(key)
+            raise UnboundError(key.val + key.tok.format_loc())
 
     def set(self, key, value):
         self.data[key] = value
@@ -143,24 +142,24 @@ def EVAL(sexp, env):
     if isinstance(sexp, SexpAtom):
         return sexp.val
     elif isinstance(sexp, SexpSymbol):
-        return env.get(sexp.val)
+        return env.get(sexp)
     elif isinstance(sexp, SexpList):
         form = sexp.val[0]
 
         if form.val == "let*":
             if len(sexp.val) < 3:
-                raise MalformedLetStructure("Bindings or Body missing")
+                raise MalformedLetStructure("Bindings or Body missing" + sexp.tok.format_loc())
             binds = sexp.val[1]
             body = sexp.val[2:]
             l_env = Env(env)
 
             if not isinstance(binds, SexpList):
-                raise MalformedLetStructure("Bindings should be a list")
+                raise MalformedLetStructure("Bindings should be a list" + binds.tok.format_loc())
             for bind in binds.val:
                 if not isinstance(bind, SexpList):
-                    raise MalformedLetStructure("Binding should be a list")
+                    raise MalformedLetStructure("Binding should be a list" + bind.tok.format_loc())
                 if len(bind.val) != 2:
-                    raise MalformedLetStructure("Binding should be a list of 2 items, key and value")
+                    raise MalformedLetStructure("Binding should be a list of 2 items, key and value" + bind.tok.format_loc())
 
                 key = bind.val[0].val
                 value = EVAL(bind.val[1], l_env)
