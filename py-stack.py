@@ -1,6 +1,11 @@
 from dataclasses import dataclass
 
 @dataclass
+class Token:
+    val: str
+    pos: int
+
+@dataclass
 class SexpAtom:
     val: any
 
@@ -36,7 +41,7 @@ class Parser:
         while idx < len(txt):
             ch = txt[idx]
             if ch == "(" or ch == ")":
-                push((ch, idx+1))
+                push(Token(ch, idx+1))
             elif ch == " ":
                 pass
             else:
@@ -45,7 +50,7 @@ class Parser:
                 while idx+1 < len(txt) and txt[idx+1] not in ["(", ")", " "]:
                     idx += 1
                     tok = tok + txt[idx]
-                push((tok, start))
+                push(Token(tok, start))
             idx += 1
         self.tokens = toks
 
@@ -57,10 +62,10 @@ class Parser:
                 return SexpSymbol(token)
 
     def raise_parse_error(self, msg, tok):
-        fmt_msg = msg + f" at character {tok[1]}"
+        fmt_msg = msg + f" at character {tok.pos}"
         fmt_msg += "\n"
         fmt_msg += self.txt + "\n"
-        fmt_msg += "-"*(tok[1]-1) + "^"
+        fmt_msg += "-"*(tok.pos-1) + "^"
         fmt_msg += "\n"
 
         raise ParseException(fmt_msg)
@@ -75,9 +80,9 @@ class Parser:
             return stack.pop()
 
         for t in self.tokens:
-            if t[0] == "(":
+            if t.val == "(":
                 push(t)
-            elif t[0] == ")":
+            elif t.val == ")":
                 lis = []
 
                 while True:
@@ -86,14 +91,14 @@ class Parser:
                         self.raise_parse_error("Unbalanced ) found", t)
                     elif isinstance(item, Sexp):
                         lis.insert(0, item)
-                    elif item[0] == "(":
+                    elif item.val == "(":
                         break
                     else: # should not reach here
                         self.raise_parse_error("Unexpected token found", item)
 
                 push(SexpList(lis))
             else:
-                push(self.read_atom(t[0]))
+                push(self.read_atom(t.val))
 
         # check if stack is empty of tokens here
         results = []
