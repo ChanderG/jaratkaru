@@ -196,6 +196,12 @@ def eval_if(sexp, env):
         else:
             return None
 
+def eval_progn(sexp, env):
+    res = None
+    for se in sexp.val[1:]:
+        res = EVAL(se, env)
+    return res
+
 def EVAL(sexp, env):
     if isinstance(sexp, SexpAtom):
         return sexp.val
@@ -210,6 +216,8 @@ def EVAL(sexp, env):
             return eval_setq(sexp, env)
         elif form.val == "if":
             return eval_if(sexp, env)
+        elif form.val == "progn":
+            return eval_progn(sexp, env)
         else:
             eval_lis = list(map(lambda x: EVAL(x, env), sexp.val))
             return eval_lis[0](*eval_lis[1:])
