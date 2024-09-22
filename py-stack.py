@@ -1,16 +1,20 @@
 from dataclasses import dataclass
+import sys
+from contextlib import contextmanager
 
-@dataclass
 class Token:
-    def __init__(self, val: str, pos: int, txt: str):
+    def __init__(self, val: str, pos: int, line: int, txt: [str]):
         self.val = val
         self.pos = pos
+        self.line = line
         self.txt = txt
 
     def format_loc(self):
         fmt_msg = f" at character {self.pos}"
+        if self.line != 0:
+            fmt_msg += f" on line number {self.line+1}"
         fmt_msg += "\n"
-        fmt_msg += self.txt + "\n"
+        fmt_msg += self.txt[self.line] + "\n"
         fmt_msg += "-"*(self.pos-1) + "^"
         fmt_msg += "\n"
 
@@ -43,31 +47,32 @@ class MalformedLetStructure(Exception):
     pass
 
 class Parser:
-    def __init__(self, txt):
+    def __init__(self, txt: [str]):
         self.txt = txt
         # Now, tokenize the input
-        # works only for single line input
         # does not work for strings
 
         toks = []
         def push(item):
             toks.append(item)
 
-        idx = 0
-        while idx < len(txt):
-            ch = txt[idx]
-            if ch == "(" or ch == ")":
-                push(Token(ch, idx+1, self.txt))
-            elif ch == " ":
-                pass
-            else:
-                tok = ch
-                start = idx
-                while idx+1 < len(txt) and txt[idx+1] not in ["(", ")", " "]:
-                    idx += 1
-                    tok = tok + txt[idx]
-                push(Token(tok, start, self.txt))
-            idx += 1
+        for lineno, line in enumerate(txt):
+            idx = 0
+            while idx < len(line):
+                ch = line[idx]
+                if ch == "(" or ch == ")":
+                    push(Token(ch, idx+1, lineno, self.txt))
+                elif ch == " ":
+                    pass
+                else:
+                    tok = ch
+                    start = idx
+                    while idx+1 < len(line) and line[idx+1] not in ["(", ")", " "]:
+                        idx += 1
+                        tok = tok + line[idx]
+                    push(Token(tok, start, lineno, self.txt))
+                idx += 1
+
         self.tokens = toks
 
     def read_atom(self, token):
@@ -200,26 +205,43 @@ def PRINT(inp):
     return inp
 
 def rep(inp):
-    sexps = READ(inp)
+    sexps = READ([inp])
     res = []
     for sexp in sexps:
         res.append(EVAL(sexp, env))
 
     return PRINT(res[-1])
 
+def load_file(filename):
+    with open(filename) as f:
+        txt = f.read().splitlines()
+
+        sexps = READ(txt)
+        for sexp in sexps:
+            EVAL(sexp, env)
+
+@contextmanager
+def catch_jk_errors():
+    try:
+        yield
+    except ParseException as p:
+        print("Error in parsing: ", p)
+    except UnboundError as e:
+        print("Unbound symbol used: ", e)
+    except MalformedLetStructure as e:
+        print("Incorrect use of let: ", e)
+    except MalformedExpression as e:
+        print("Malformed expression: ", e)
+
 def main():
+    if len(sys.argv) == 2:
+        with catch_jk_errors():
+            load_file(sys.argv[1])
+
     while True:
-        try:
+        with catch_jk_errors():
             inp = input("user> ")
             print(rep(inp))
-        except ParseException as p:
-            print("Error in parsing: ", p)
-        except UnboundError as e:
-            print("Unbound symbol used: ", e)
-        except MalformedLetStructure as e:
-            print("Incorrect use of let: ", e)
-        except MalformedExpression as e:
-            print("Malformed expression: ", e)
 
 env = Env()
 env.set('+', lambda a,b: a+b)
