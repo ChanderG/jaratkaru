@@ -268,8 +268,18 @@ def EVAL(sexp, env):
     else:
         return sexp # not even an sexp here
 
-def PRINT(inp):
-    return inp
+def PRINT(sexp):
+    if isinstance(sexp, SexpList):
+        res = ""
+        for s in sexp.val:
+            res += " "
+            res +=  PRINT(s)
+        return "(" + res[1:] + ")"
+
+    elif isinstance(sexp, Sexp):
+        return str(sexp.val)
+    else:
+        return str(sexp) # not a sexp
 
 def rep(inp):
     sexps = READ([inp])
