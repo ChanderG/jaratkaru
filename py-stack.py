@@ -37,6 +37,8 @@ class ParseException(Exception):
     pass
 class UnboundError(Exception):
     pass
+class MalformedExpression(Exception):
+    pass
 class MalformedLetStructure(Exception):
     pass
 
@@ -163,6 +165,19 @@ def eval_let_star(sexp, env):
         res = EVAL(b, l_env)
     return res
 
+def eval_setq(sexp, env):
+    if len(sexp.val) != 3:
+        raise MalformedExpression("setq should have 2 args" + sexp.tok.format_loc())
+
+    var = sexp.val[1]
+    if not isinstance(var, SexpSymbol):
+        raise MalformedExpression("setq should have symbol as first arg" + var.tok.format_loc())
+    body = sexp.val[2]
+    res = EVAL(body, env)
+    env.set(var.val, res)
+
+    return res
+
 def EVAL(sexp, env):
     if isinstance(sexp, SexpAtom):
         return sexp.val
@@ -173,6 +188,8 @@ def EVAL(sexp, env):
 
         if form.val == "let*":
             return eval_let_star(sexp, env)
+        elif form.val == "setq":
+            return eval_setq(sexp, env)
         else:
             eval_lis = list(map(lambda x: EVAL(x, env), sexp.val))
             return eval_lis[0](*eval_lis[1:])
@@ -183,17 +200,11 @@ def PRINT(inp):
     return inp
 
 def rep(inp):
-    env = Env()
-
-    env.set('+', lambda a,b: a+b)
-    env.set('-', lambda a,b: a-b)
-    env.set('*', lambda a,b: a*b)
-    env.set('/', lambda a,b: a/b)
-
     sexps = READ(inp)
     res = []
     for sexp in sexps:
         res.append(EVAL(sexp, env))
+
     return PRINT(res[-1])
 
 def main():
@@ -207,5 +218,13 @@ def main():
             print("Unbound symbol used: ", e)
         except MalformedLetStructure as e:
             print("Incorrect use of let: ", e)
+        except MalformedExpression as e:
+            print("Malformed expression: ", e)
+
+env = Env()
+env.set('+', lambda a,b: a+b)
+env.set('-', lambda a,b: a-b)
+env.set('*', lambda a,b: a*b)
+env.set('/', lambda a,b: a/b)
 
 main()
