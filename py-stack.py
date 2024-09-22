@@ -18,6 +18,8 @@ class ParseException(Exception):
     pass
 class UnboundError(Exception):
     pass
+class MalformedLetStructure(Exception):
+    pass
 
 class Parser:
     def __init__(self, txt):
@@ -132,8 +134,35 @@ def EVAL(sexp, env):
     elif isinstance(sexp, SexpSymbol):
         return env.get(sexp.val)
     elif isinstance(sexp, SexpList):
-        eval_lis = list(map(lambda x: EVAL(x, env), sexp.val))
-        return eval_lis[0](*eval_lis[1:])
+        form = sexp.val[0]
+
+        if form.val == "let*":
+            if len(sexp.val) < 3:
+                raise MalformedLetStructure("Bindings or Body missing")
+            binds = sexp.val[1]
+            body = sexp.val[2:]
+            l_env = Env(env)
+
+            if not isinstance(binds, SexpList):
+                raise MalformedLetStructure("Bindings should be a list")
+            for bind in binds.val:
+                if not isinstance(bind, SexpList):
+                    raise MalformedLetStructure("Binding should be a list")
+                if len(bind.val) != 2:
+                    raise MalformedLetStructure("Binding should be a list of 2 items, key and value")
+
+                key = bind.val[0].val
+                value = EVAL(bind.val[1], l_env)
+                l_env.set(key, value)
+
+            # eval all forms, return the result of the last one
+            res = None
+            for b in body:
+                res = EVAL(b, l_env)
+            return res
+        else:
+            eval_lis = list(map(lambda x: EVAL(x, env), sexp.val))
+            return eval_lis[0](*eval_lis[1:])
     else:
         return None
 
@@ -163,5 +192,7 @@ def main():
             print("Error in parsing: ", p)
         except UnboundError as e:
             print("Unbound symbol used: ", e)
+        except MalformedLetStructure as e:
+            print("Incorrect use of let: ", e)
 
 main()
