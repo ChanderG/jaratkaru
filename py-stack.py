@@ -138,6 +138,31 @@ def READ(inp):
     p = Parser(inp)
     return p.parse()
 
+def eval_let_star(sexp, env):
+    if len(sexp.val) < 3:
+        raise MalformedLetStructure("Bindings or Body missing" + sexp.tok.format_loc())
+    binds = sexp.val[1]
+    body = sexp.val[2:]
+    l_env = Env(env)
+
+    if not isinstance(binds, SexpList):
+        raise MalformedLetStructure("Bindings should be a list" + binds.tok.format_loc())
+    for bind in binds.val:
+        if not isinstance(bind, SexpList):
+            raise MalformedLetStructure("Binding should be a list" + bind.tok.format_loc())
+        if len(bind.val) != 2:
+            raise MalformedLetStructure("Binding should be a list of 2 items, key and value" + bind.tok.format_loc())
+
+        key = bind.val[0].val
+        value = EVAL(bind.val[1], l_env)
+        l_env.set(key, value)
+
+    # eval all forms, return the result of the last one
+    res = None
+    for b in body:
+        res = EVAL(b, l_env)
+    return res
+
 def EVAL(sexp, env):
     if isinstance(sexp, SexpAtom):
         return sexp.val
@@ -147,29 +172,7 @@ def EVAL(sexp, env):
         form = sexp.val[0]
 
         if form.val == "let*":
-            if len(sexp.val) < 3:
-                raise MalformedLetStructure("Bindings or Body missing" + sexp.tok.format_loc())
-            binds = sexp.val[1]
-            body = sexp.val[2:]
-            l_env = Env(env)
-
-            if not isinstance(binds, SexpList):
-                raise MalformedLetStructure("Bindings should be a list" + binds.tok.format_loc())
-            for bind in binds.val:
-                if not isinstance(bind, SexpList):
-                    raise MalformedLetStructure("Binding should be a list" + bind.tok.format_loc())
-                if len(bind.val) != 2:
-                    raise MalformedLetStructure("Binding should be a list of 2 items, key and value" + bind.tok.format_loc())
-
-                key = bind.val[0].val
-                value = EVAL(bind.val[1], l_env)
-                l_env.set(key, value)
-
-            # eval all forms, return the result of the last one
-            res = None
-            for b in body:
-                res = EVAL(b, l_env)
-            return res
+            return eval_let_star(sexp, env)
         else:
             eval_lis = list(map(lambda x: EVAL(x, env), sexp.val))
             return eval_lis[0](*eval_lis[1:])
