@@ -9,6 +9,11 @@ class Token:
         self.line = line
         self.txt = txt
 
+    def __str__(self):
+        return self.val
+    def __repr__(self):
+        return self.val
+
     def format_loc(self):
         fmt_msg = f" at character {self.pos}"
         if self.line != 0:
@@ -123,7 +128,25 @@ class Parser:
             else: # un-expected
                 raise ParseException("Unbalanced ( found" + item.format_loc())
 
+        self.ast = results
         return results
+
+    def post_parse(self):
+        self._post_parse(self.ast)
+        return self.ast
+
+    def _post_parse(self, sexps):
+        i = 0
+        while i < len(sexps):
+            if isinstance(sexps[i], SexpList):
+                self._post_parse(sexps[i].val)
+            elif isinstance(sexps[i], SexpSymbol):
+                if sexps[i].val == "'":
+                    self._post_parse(sexps[i+1].val)
+                    sexps[i] = SexpList(val=[SexpSymbol("quote", sexps[i].tok), sexps[i+1]],
+                                        tok=sexps[i].tok)
+                    del sexps[i+1]
+            i += 1
 
 class Env:
     def __init__(self, outer = None):
@@ -160,7 +183,9 @@ class Proc:
 
 def READ(inp):
     p = Parser(inp)
-    return p.parse()
+    res = p.parse()
+    res = p.post_parse()
+    return res
 
 def eval_let_star(sexp, env):
     if len(sexp.val) < 3:
