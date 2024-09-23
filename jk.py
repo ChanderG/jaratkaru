@@ -80,7 +80,7 @@ class Parser:
             idx = 0
             while idx < len(line):
                 ch = line[idx]
-                if ch == "(" or ch == ")":
+                if ch in ["(", ")", "'", "`", ","]:
                     push(Token(ch, idx+1, lineno, self.txt))
                 elif ch == " ":
                     pass
@@ -151,16 +151,21 @@ class Parser:
         return self.ast
 
     def _post_parse(self, sexps):
+        macros = {"'": "quote",
+                  "`": "quasiquote",
+                  ",": "unquote",}
         i = 0
         while i < len(sexps):
             if isinstance(sexps[i], SexpList):
                 self._post_parse(sexps[i].val)
             elif isinstance(sexps[i], SexpSymbol):
-                if sexps[i].val == "'":
-                    self._post_parse(sexps[i+1].val)
-                    sexps[i] = SexpList(val=[SexpSymbol("quote", sexps[i].tok), sexps[i+1]],
-                                        tok=sexps[i].tok)
+                if sexps[i].val in macros.keys():
+                    if isinstance(sexps[i+1], SexpList):
+                        self._post_parse(sexps[i+1].val)
+                    new_lis = [SexpSymbol(macros[sexps[i].val], sexps[i].tok), sexps[i+1]]
+                    sexps[i] = SexpList(val=new_lis, tok=sexps[i].tok)
                     del sexps[i+1]
+
             i += 1
 
 class Env:
@@ -332,6 +337,8 @@ def EVAL(sexp, env):
             return eval_eval(sexp, env)
         elif form.val == "quasiquote":
             return eval_quasiquote(sexp, env)
+        elif form.val == "unquote":
+            raise MalformedExpression("unquote cannot be used outside a quasiquote" + sexp.tok.format_loc())
         else:
             eval_lis = list(map(lambda x: EVAL(x, env), sexp.val))
             return eval_lis[0](*eval_lis[1:])
