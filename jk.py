@@ -50,6 +50,21 @@ class MalformedExpression(Exception):
     pass
 class MalformedLetStructure(Exception):
     pass
+class TypeNotImplemented(Exception):
+    pass
+
+def autowrap_raw(item):
+    if isinstance(item, Sexp):
+        return item # already in the right format!
+    if isinstance(item, int):
+        return SexpAtom(item, None)
+    if isinstance(item, str):
+        return SexpSymbol(item, None)
+    if isinstance(item, list):
+        items = list(map(autowrap_raw, item))
+        return SexpList(items, None)
+    else:
+        raise TypeNotImplemented(f"the type {type(item).__name__} is not implemented in Jaratkaru")
 
 class Parser:
     def __init__(self, txt: [str]):
@@ -265,6 +280,34 @@ def eval_eval(sexp, env):
 
     return EVAL(EVAL(sexp.val[1], env), env)
 
+def handle_quasiquote_sexp(parexp, pos, env):
+    """
+    Try to unquote any child of the current exp.
+    The curren exp is input as the pos'th child of parexp.
+
+    This trick is used to be able to carry over changes by mutating the parent array.
+    """
+    sexp = parexp.val[pos]
+    if isinstance(sexp, SexpList):
+        ff = sexp.val[0]
+        if isinstance(ff, SexpSymbol) and ff.val == "unquote":
+            if len(sexp.val) != 2:
+                raise MalformedExpression("single arg expected to unquote" + sexp.tok.format_loc())
+            new_sexp = autowrap_raw(EVAL(sexp.val[1], env))
+            new_sexp.tok = sexp.tok
+            parexp.val[pos] = new_sexp
+        else:
+            for ind in range(len(sexp.val)):
+                handle_quasiquote_sexp(sexp, ind, env)
+            parexp.val[pos] = sexp
+
+def eval_quasiquote(sexp, env):
+    if len(sexp.val) != 2:
+        raise MalformedExpression("single arg expected to quasiquote" + sexp.tok.format_loc())
+
+    handle_quasiquote_sexp(sexp, 1, env)
+    return sexp.val[1]
+
 def EVAL(sexp, env):
     if isinstance(sexp, SexpAtom):
         return sexp.val
@@ -287,6 +330,8 @@ def EVAL(sexp, env):
             return eval_quote(sexp, env)
         elif form.val == "eval":
             return eval_eval(sexp, env)
+        elif form.val == "quasiquote":
+            return eval_quasiquote(sexp, env)
         else:
             eval_lis = list(map(lambda x: EVAL(x, env), sexp.val))
             return eval_lis[0](*eval_lis[1:])
