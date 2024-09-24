@@ -1,0 +1,2 @@
+(defmacro setq2 (a b c)
+  `(setq ,a (setq ,b ,c)))

@@ -185,10 +185,11 @@ class Env:
         self.data[key] = value
 
 class Proc:
-    def __init__(self, params, body, env):
+    def __init__(self, params, body, env, is_macro=False):
         self.params = params
         self.body = body
         self.env = env
+        self.is_macro = is_macro
 
     def __call__(self, *args):
         # new env for the func context
@@ -313,6 +314,20 @@ def eval_quasiquote(sexp, env):
     handle_quasiquote_sexp(sexp, 1, env)
     return sexp.val[1]
 
+def eval_defun_or_defmacro(sexp, env, is_macro=False):
+    if len(sexp.val) < 4:
+        raise MalformedExpression("too few exp in definition" + sexp.tok.format_loc())
+
+    if not isinstance(sexp.val[1], SexpSymbol):
+        raise MalformedExpression("name should be second arg for def" + sexp.tok.format_loc())
+
+    if not isinstance(sexp.val[2], SexpList):
+        raise MalformedExpression("arg definition should be a list" + sexp.tok.format_loc())
+
+    proc = Proc(sexp.val[2], sexp.val[3:], env, is_macro)
+    env.set(sexp.val[1].val, proc)
+    return proc
+
 def EVAL(sexp, env):
     if isinstance(sexp, SexpAtom):
         return sexp.val
@@ -339,9 +354,18 @@ def EVAL(sexp, env):
             return eval_quasiquote(sexp, env)
         elif form.val == "unquote":
             raise MalformedExpression("unquote cannot be used outside a quasiquote" + sexp.tok.format_loc())
+        elif form.val == "defun":
+            return eval_defun_or_defmacro(sexp, env, False)
+        elif form.val == "defmacro":
+            return eval_defun_or_defmacro(sexp, env, True)
         else:
-            eval_lis = list(map(lambda x: EVAL(x, env), sexp.val))
-            return eval_lis[0](*eval_lis[1:])
+            proc = EVAL(sexp.val[0], env)
+            if hasattr(proc, "is_macro") and proc.is_macro:
+                form = proc(*sexp.val[1:]) # apply on un-evaled args
+                return EVAL(form, env)
+            else:
+                args = list(map(lambda x: EVAL(x, env), sexp.val[1:]))
+                return proc(*args) # eval args and then apply
     else:
         return sexp # not even an sexp here
 
