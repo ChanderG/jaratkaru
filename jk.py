@@ -80,6 +80,8 @@ class Parser:
             idx = 0
             while idx < len(line):
                 ch = line[idx]
+                if ch == ";": # handle comments
+                    break
                 if ch in ["(", ")", "'", "`", ","]:
                     push(Token(ch, idx+1, lineno, self.txt))
                 elif ch == " ":
