@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import sys
 from contextlib import contextmanager
+import operator as op
 
 class Token:
     def __init__(self, val: str, pos: int, line: int, txt: [str]):
@@ -185,6 +186,10 @@ class Env:
 
     def set(self, key, value):
         self.data[key] = value
+
+    def mset(self, kv_dict):
+        for k, v in kv_dict.items():
+            self.set(k, v)
 
 class Proc:
     def __init__(self, params, body, env, is_macro=False):
@@ -424,11 +429,8 @@ def main():
             print(rep(inp))
 
 env = Env()
-env.set('+', lambda a,b: a+b)
-env.set('-', lambda a,b: a-b)
-env.set('*', lambda a,b: a*b)
-env.set('/', lambda a,b: a/b)
-env.set('<', lambda a,b: a<b)
-env.set('print', print)
+env.mset({'+': op.add, '-': op.sub, '*': op.mul, '/': op.truediv,
+          '>':op.gt, '<':op.lt, '>=':op.ge, '<=':op.le, '=':op.eq,
+          'print': print})
 
 main()
