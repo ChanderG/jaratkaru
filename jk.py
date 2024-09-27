@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import sys
 from contextlib import contextmanager
 import operator as op
+from functools import partial
 
 class Token:
     def __init__(self, val: str, pos: int, line: int, txt: [str]):
@@ -53,6 +54,8 @@ class MalformedLetStructure(Exception):
     pass
 class TypeNotImplemented(Exception):
     pass
+class IncorrectArgument(Exception):
+    pass
 
 def autowrap_raw(item):
     if isinstance(item, Sexp):
@@ -66,8 +69,9 @@ def autowrap_raw(item):
     if isinstance(item, list):
         items = list(map(autowrap_raw, item))
         return SexpList(items, None)
-    else:
-        raise TypeNotImplemented(f"the type {type(item).__name__} is not implemented in Jaratkaru")
+    if item in [None, True, False]:
+        return SexpAtom(item, None)
+    raise TypeNotImplemented(f"the type {type(item).__name__} is not implemented in Jaratkaru")
 
 class Parser:
     def __init__(self, txt: [str]):
@@ -276,7 +280,7 @@ def eval_if(sexp, env):
     if len(sexp.val) > 4:
         raise MalformedExpression("if should have max 4 args" + sexp.tok.format_loc())
 
-    condition = EVAL(sexp.val[1], env)
+    condition = EVAL(sexp.val[1], env).val
     if condition:
         return EVAL(sexp.val[2], env)
     else:
@@ -356,10 +360,12 @@ def eval_defun_or_defmacro(sexp, env, is_macro=False):
 
 def EVAL(sexp, env):
     if isinstance(sexp, SexpAtom):
-        return sexp.val
+        return sexp
     elif isinstance(sexp, SexpSymbol):
         return env.get(sexp)
     elif isinstance(sexp, SexpList):
+        if len(sexp.val) == 0:
+            return None
         form = sexp.val[0]
 
         if form.val == "let*":
@@ -452,8 +458,40 @@ def main():
             print(rep(inp))
 
 env = Env()
-env.mset({'+': op.add, '-': op.sub, '*': op.mul, '/': op.truediv,
-          '>':op.gt, '<':op.lt, '>=':op.ge, '<=':op.le, '=':op.eq,
-          'print': print})
+
+# Built-ins
+
+def atom2(oper):
+    def fun(x, y):
+        print(x, y)
+        if not isinstance(x, SexpAtom):
+            raise IncorrectArgument("exected atom")
+        if not isinstance(y, SexpAtom):
+            raise IncorrectArgument("exected atom")
+        return oper(x.val, y.val)
+    return fun
+
+def anyN(oper):
+    def fun(*args):
+        print(args)
+        un_args = list(map(lambda x: x.val, args))
+        return oper(*un_args)
+    return fun
+
+def list1(oper):
+    def fun(lis):
+        if not isinstance(lis, SexpList):
+            raise IncorrectArgument("exected list")
+        return oper(lis.val)
+    return fun
+
+env.mset({'+': atom2(op.add), '-': atom2(op.sub),
+          '*': atom2(op.mul), '/': atom2(op.truediv)})
+env.mset({'>': anyN(op.gt), '<': anyN(op.lt),
+          '>=': anyN(op.ge), '<=': anyN(op.le), '=': anyN(op.eq)})
+env.set('print', anyN(print))
+env.mset({'car': list1(lambda x: x[0]), 'cdr': list1(lambda x: x[1:]),
+          'len': list1(len),})
+
 
 main()
