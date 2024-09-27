@@ -60,7 +60,9 @@ def autowrap_raw(item):
     if isinstance(item, int):
         return SexpAtom(item, None)
     if isinstance(item, str):
-        return SexpSymbol(item, None)
+        # all string return values are atoms
+        # not symbols
+        return SexpAtom(item, None)
     if isinstance(item, list):
         items = list(map(autowrap_raw, item))
         return SexpList(items, None)
@@ -87,6 +89,21 @@ class Parser:
                     push(Token(ch, idx+1, lineno, self.txt))
                 elif ch == " ":
                     pass
+                elif ch == '"':
+                    tok = ch
+                    start = idx
+                    while idx+1 < len(line) and line[idx+1] not in ['"']:
+                        idx += 1
+                        tok = tok + line[idx]
+                    if idx + 1 == len(line): # reached end of line without finding "
+                        # create a temp token to use it for error formatting
+                        t = Token(tok, start, lineno, self.txt)
+                        raise ParseException("Unbalanced \" found" + t.format_loc())
+                    else:
+                        # consume the closing "
+                        idx += 1
+                        tok = tok + line[idx]
+                        push(Token(tok, start, lineno, self.txt))
                 else:
                     tok = ch
                     start = idx
@@ -103,6 +120,8 @@ class Parser:
         except ValueError:
             try: return SexpAtom(float(token.val), token)
             except ValueError:
+                if token.val[0] == '"' and token.val[-1] == '"':
+                    return SexpAtom(token.val[1:-1], token)
                 return SexpSymbol(token.val, token)
 
     def parse(self):
@@ -372,7 +391,7 @@ def EVAL(sexp, env):
                 return EVAL(form, env)
             else:
                 args = list(map(lambda x: EVAL(x, env), sexp.val[1:]))
-                return proc(*args) # eval args and then apply
+                return autowrap_raw(proc(*args)) # eval args and then apply
     else:
         return sexp # not even an sexp here
 
@@ -383,7 +402,11 @@ def PRINT(sexp):
             res += " "
             res +=  PRINT(s)
         return "(" + res[1:] + ")"
-
+    elif isinstance(sexp, SexpAtom):
+        if isinstance(sexp.val, str):
+            return '"' + sexp.val + '"'
+        else:
+            return str(sexp.val)
     elif isinstance(sexp, Sexp):
         return str(sexp.val)
     else:
