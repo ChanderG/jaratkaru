@@ -461,37 +461,20 @@ env = Env()
 
 # Built-ins
 
-def atom2(oper):
-    def fun(x, y):
-        print(x, y)
-        if not isinstance(x, SexpAtom):
-            raise IncorrectArgument("exected atom")
-        if not isinstance(y, SexpAtom):
-            raise IncorrectArgument("exected atom")
-        return oper(x.val, y.val)
-    return fun
-
 def anyN(oper):
     def fun(*args):
-        print(args)
-        un_args = list(map(lambda x: x.val, args))
+        un_args = list(map(lambda x: x.val if isinstance(x, Sexp) else x, args))
         return oper(*un_args)
     return fun
 
-def list1(oper):
-    def fun(lis):
-        if not isinstance(lis, SexpList):
-            raise IncorrectArgument("exected list")
-        return oper(lis.val)
-    return fun
-
-env.mset({'+': atom2(op.add), '-': atom2(op.sub),
-          '*': atom2(op.mul), '/': atom2(op.truediv)})
+env.mset({'+': anyN(op.add), '-': anyN(op.sub),
+          '*': anyN(op.mul), '/': anyN(op.truediv)})
 env.mset({'>': anyN(op.gt), '<': anyN(op.lt),
           '>=': anyN(op.ge), '<=': anyN(op.le), '=': anyN(op.eq)})
 env.set('print', anyN(print))
-env.mset({'car': list1(lambda x: x[0]), 'cdr': list1(lambda x: x[1:]),
-          'len': list1(len),})
+env.mset({'car': anyN(lambda x: x[0]), 'cdr': anyN(lambda x: x[1:]),
+          'len': anyN(len),})
+env.set('map', lambda x, y: list(anyN(map)(x,y)))
 
 
 main()
